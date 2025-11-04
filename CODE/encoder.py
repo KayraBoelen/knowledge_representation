@@ -43,7 +43,7 @@ def to_cnf(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
     clauses += exactly_one_in_col(N) # (2) For each value v and each row r: exactly one column c has v
     clauses += exactly_one_in_row(N) # (3) For each value v and each column c: exactly one row r has v
     clauses += exactly_one_in_box(N) # (4) For each value v and each sqrt(N)×sqrt(N) box: exactly one cell has v
-    # clauses += non_consecutive(N)    # (5) Non-consecutive: orthogonal neighbors cannot differ by 1
+    clauses += non_consecutive(N)    # (5) Non-consecutive: orthogonal neighbors cannot differ by 1
     clauses += clues(puzzle, N)      # (6) Clues: unit clauses for the given puzzle
   
     print("Clauses after (6):", len(clauses))
@@ -119,11 +119,19 @@ def non_consecutive(N):
     for x in range(N):
         for y in range(N):
             for dx in [-1, 1]:
-                for dy in [-1, 1]:
-                    if 0 <= x + dx < N and 0 <= y + dy < N:
-                        for v in range(1, N + 1):
-                            clauses.append([-var(x, y, v, N), -var(x + dx, y + dy, v + 1, N)])
-                            clauses.append([-var(x, y, v, N), -var(x + dx, y + dy, v - 1, N)])
+                if 0 <= x + dx < N:
+                    for v in range(1, N + 1):
+                        if v + 1 <= N:
+                            clauses.append([-var(x, y, v, N), -var(x + dx, y, v + 1, N)])
+                        if v - 1 >= 1:
+                            clauses.append([-var(x, y, v, N), -var(x + dx, y, v - 1, N)])
+            for dy in [-1, 1]:
+                if 0 <= y + dy < N:
+                    for v in range(1, N + 1):
+                        if v - 1 >= 1:
+                            clauses.append([-var(x, y, v, N), -var(x, y + dy, v - 1, N)])
+                        if v + 1 <= N:
+                            clauses.append([-var(x, y, v, N), -var(x, y + dy, v + 1, N)])
 
     return clauses
 

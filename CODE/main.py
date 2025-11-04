@@ -41,6 +41,7 @@ def parse_args():
 def main():
     args = parse_args()
     clauses, num_vars = to_cnf(args.inp)
+
     if args.out:
         write_dimacs(args.out, num_vars, clauses)
     else:

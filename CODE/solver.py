@@ -37,17 +37,18 @@ def dpll_recursive(clauses, model=set()):
     # UNSAT
     if clauses == [[]]:
         return "UNSAT", None
-    
     # Branching Step
     literal = branching_step(clauses, model)
-    
+    literal2 = maximum_occurence_minimal(clauses, 3)
     model.add(literal)
+
     
     sat, model = dpll_recursive(clauses , model)
 
     if sat == "SAT":
         print("Found SAT by assigning literal:", literal)
         return "SAT", sorted(model)
+
     else:
         model.remove(literal)
         model.add(-literal)
@@ -108,7 +109,46 @@ def branching_step(clauses, model):
     print("Max combined sum:", max_sum)
         
     return max_literal
-            
+
+def maximum_occurence_minimal(clauses, k):
+    literals = set()
+    count_x = {}
+    count_x_prime = {}
+    min_len = float("inf")
+    max_f = float("-inf")
+    max_literal = None
+    min_clauses = []
+    for clause in clauses:
+        if len(clause) < min_len and len(clause) != 1:
+            min_len = len(clause)
+    for clause in clauses:
+        if len(clause) == min_len:
+            min_clauses.append(clause)
+    for clause in clauses:
+        for literal in clause:
+            literals.add(literal)
+            if literal > 0:
+                if literal not in count_x:
+                    count_x[literal] = 1
+                else:
+                    count_x[literal] += 1
+            else:
+                if literal not in count_x_prime:
+                    count_x_prime[literal] = 1
+                else:
+                    count_x_prime[literal] += 1
+    for literal in literals:
+        x = count_x.get(literal, 0)
+        x_prime = count_x_prime.get(literal, 0)
+        f_x = (x + x_prime)*2^k + x * x_prime
+        if f_x > max_f:
+            max_f = f_x
+            max_literal = literal
+    print("MOM's literal:", max_literal)
+    print("max_function_value:", max_f)
+    return max_literal
+
+
 def remove_tautologies(clauses):
     for clause in clauses:
         if len(clause) == 2:

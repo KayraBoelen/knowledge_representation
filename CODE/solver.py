@@ -38,8 +38,8 @@ def dpll_recursive(clauses, model=set()):
     if clauses == [[]]:
         return "UNSAT", None
     # Branching Step
-    literal = branching_step(clauses, model)
-    literal2 = maximum_occurence_minimal(clauses, 3)
+    # literal = branching_step(clauses, model)
+    literal = maximum_occurence_minimal(clauses, 3)
     model.add(literal)
 
     
@@ -124,7 +124,9 @@ def maximum_occurence_minimal(clauses, k):
     for clause in clauses:
         if len(clause) == min_len:
             min_clauses.append(clause)
-    for clause in clauses:
+    if len(min_clauses) == 0 and min_len == float("inf"):
+        min_clauses = clauses
+    for clause in min_clauses:
         for literal in clause:
             literals.add(literal)
             if literal > 0:

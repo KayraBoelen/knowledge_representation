@@ -7,6 +7,7 @@ Implement: solve_cnf(clauses) -> (status, model_or_None)"""
 
 
 from typing import Iterable, List, Tuple
+import time
 #from xml.parsers.expat import model
 
 def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, List[int] | None]:
@@ -16,62 +17,114 @@ def solve_cnf(clauses: Iterable[Iterable[int]], num_vars: int) -> Tuple[str, Lis
       ("SAT", model)  where model is a list of ints (DIMACS-style), or
       ("UNSAT", None)
     """
-    return dpll_recursive(clauses)
+    # Convert to list of lists for proper manipulation
+    clauses_list = [list(clause) for clause in clauses]
+    start_time = time.time()
+    return dpll_recursive(clauses_list, start_time=start_time)
 
-def dpll_recursive(clauses, model=set()):
+def dpll_recursive(clauses, start_time: float, model=None, ):
+    # Initialize model if None
+    if model is None:
+        model = set()
+    now = time.time()
+    if (now - start_time) >= 60:
+        return "UNSOLVED", None
+     # SAT
+    if clauses == []:
+        return "SAT", sorted(list(model))
     
-    # Simplification Steps
+    # UNSAT - check if any clause is empty
+    if any(clause == [] for clause in clauses):
+        return "UNSAT", None
+    
     # Remove Tautologies
     clauses = remove_tautologies(clauses)
     # Unit Propagation
     clauses, model = unit_propagation(clauses, model)
-    print("Clauses after Unit Propagation:", len(clauses))
+
+    if clauses is None:
+        return "UNSAT", None
+    #print(len(clauses))
     # Pure Literal Elimination
     clauses, model = pure_literal_elimination(clauses, model)
-    print("Clauses after Pure Literal Elimination:", len(clauses))
-
-     # SAT
+    # print(len(clauses))
+    # Check again after pure literal elimination
     if clauses == []:
-        return "SAT", model
+        return "SAT", sorted(list(model))
     
-    # UNSAT
-    if clauses == [[]]:
+    if any(clause == [] for clause in clauses):
         return "UNSAT", None
+    
     # Branching Step
     # literal = branching_step(clauses, model)
-    literal = maximum_occurence_minimal(clauses, 3)
-    model.add(literal)
+    literal = maximum_occurence_minimal(clauses, 2)
 
-    
-    sat, model = dpll_recursive(clauses , model)
-
-    if sat == "SAT":
-        print("Found SAT by assigning literal:", literal)
-        return "SAT", sorted(model)
-
-    else:
-        model.remove(literal)
-        model.add(-literal)
-        print("Backtracking on literal:", literal)
-        sat, model = dpll_recursive(clauses , model)
-        if sat == "SAT":
-            print("Found SAT by assigning literal:", -literal)
-            return "SAT", sorted(model)
+    if literal is None:
+        # No more literals to branch on
+        # If clauses are empty, it's SAT, otherwise UNSAT
+        if clauses == []:
+            return "SAT", sorted(list(model))
         else:
             return "UNSAT", None
 
+    # Try assigning literal to True
+    model_copy = model.copy()
+    model_copy.add(literal)
+    # Simplify clauses with the assigned literal
+    clauses_simplified = remove_literal(clauses, literal)
+    sat, model2 = dpll_recursive(clauses_simplified, start_time, model_copy)
+    now = time.time()
+    if (now - start_time) >= 60:
+        return "UNSOLVED", None
+    if sat == "SAT":
+        # print("Found SAT by assigning literal:", literal)
+        # Ensure model is returned as sorted list
+        if isinstance(model2, set):
+            return "SAT", sorted(list(model2))
+        return "SAT", model2
+    
+    # Backtrack: try assigning literal to False
+    # print("Backtracking on literal:", literal)
+    model_copy = model.copy()
+    model_copy.add(-literal)
+    # Simplify clauses with the negated literal
+    clauses_simplified = remove_literal(clauses, -literal)
+    sat, model3 = dpll_recursive(clauses_simplified, start_time, model_copy)
+    now = time.time()
+    if (now - start_time) >= 60:
+        return "UNSOLVED", None
+    if sat == "SAT":
+        # print("Found SAT by assigning literal:", -literal)
+        # Ensure model is returned as sorted list
+        if isinstance(model3, set):
+            return "SAT", sorted(list(model3))
+        return "SAT", model3
+    else:
+        return "UNSAT", None
+
 def unit_propagation(clauses, model):
-    unit_clauses = [clause for clause in clauses if len(clause) == 1]
-
-    for clause in unit_clauses:
-        literal = clause[0]
-        model.add(literal)
-        clauses = remove_literal(clauses, literal)
-
-    for literal in model:
-        for clause in clauses:
-            if literal in clause:
+    # Repeat until no more unit clauses
+    changed = True
+    while changed:
+        changed = False
+        unit_clauses = [clause for clause in clauses if len(clause) == 1]
+        
+        for clause in unit_clauses:
+            literal = clause[0]
+            
+            # Conflict detected
+            if -literal in model:
+                return None, None
+            
+            # Add unit literal to model if not already there
+            if literal not in model:
+                model.add(literal)
                 clauses = remove_literal(clauses, literal)
+                changed = True
+                
+                # Check for empty clause after simplification
+                if any(c == [] for c in clauses):
+                    return None, None
     
     return clauses, model
 
@@ -141,34 +194,45 @@ def maximum_occurence_minimal(clauses, k):
                     count_x_prime[literal] += 1
     for literal in literals:
         x = count_x.get(literal, 0)
-        x_prime = count_x_prime.get(literal, 0)
-        f_x = (x + x_prime)*2^k + x * x_prime
+        x_prime = count_x_prime.get(-literal, 0)  # Look for negation
+        f_x = (x + x_prime)*2**k + x * x_prime
         if f_x > max_f:
             max_f = f_x
             max_literal = literal
-    print("MOM's literal:", max_literal)
-    print("max_function_value:", max_f)
+    # print("MOM's literal:", max_literal)
+    # print("max_function_value:", max_f)
     return max_literal
 
 
 def remove_tautologies(clauses):
+    # Don't modify list during iteration - create new list
+    new_clauses = []
     for clause in clauses:
-        if len(clause) == 2:
-            if clause[0] == -clause[1]:
-                clauses.remove(clause)
+        # Check if clause contains both x and -x (tautology)
+        is_tautology = False
+        for lit in clause:
+            if -lit in clause:
+                is_tautology = True
+                break
+        if not is_tautology:
+            new_clauses.append(clause)
     
-    return clauses
+    return new_clauses
 
 def remove_literal(clauses, literal):
     new_clauses = []
 
     for clause in clauses:
-        if literal not in clause and -literal not in clause:
-            new_clauses.append(clause)
-        if -1*literal in clause:
+        # If clause contains literal, it's satisfied - remove entire clause
+        if literal in clause:
+            continue
+        # If clause contains -literal, remove -literal from clause
+        elif -literal in clause:
             new_clause = [lit for lit in clause if lit != -literal]
-            if new_clause != []:
-                new_clauses.append(new_clause)
+            new_clauses.append(new_clause)
+        # Otherwise, keep clause unchanged
+        else:
+            new_clauses.append(clause)
         
     return new_clauses
 

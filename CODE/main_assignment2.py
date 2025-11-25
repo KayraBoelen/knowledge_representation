@@ -20,6 +20,8 @@ import argparse
 from typing import Tuple, Iterable
 from encoder import to_cnf
 from solver import solve_cnf
+import json
+import time
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -29,19 +31,13 @@ def parse_args():
 
 def main():
 
-    # args = parse_args()
-
-    # if(args.sat):
-      # clauses, num_vars = parse_dimacs(args.inp)
-    #clauses, num_vars = parse_dimacs("/Users/richard/Documents/MSc Artificial Inteligence /assignments/knowledge representation/SAT Project - Assignment 2 - Files/EXAMPLE puzzles (input)/slides_example.cnf")
-    clauses, num_vars = parse_dimacs("/Users/richard/Documents/MSc Artificial Inteligence /assignments/knowledge representation/SAT Project - Assignment 2 - Files/EXAMPLE puzzles (input)/DIMACS_9.cnf")
-    #clauses, num_vars = parse_dimacs("/Users/richard/Documents/MSc Artificial Inteligence /assignments/knowledge representation/SAT Project - Assignment 2 - Files/EXAMPLE puzzles (input)/teste.cnf")
-
-    # else:
-    #   clauses, num_vars = to_cnf(args.inp)
-
+  times = []
+  for i in range(100):
+    clauses, num_vars = parse_dimacs(f"/Users/rjkbo/Ariel/knowledge_representation/CODE/UF250_106_100/uf250-0{i+1}.cnf")
+    start = time.time()
     status, model = solve_cnf(clauses, num_vars)
-
+    end_time = time.time() - start
+    times.append(end_time)
     print(status)
 
     # model_negatives = set()
@@ -65,7 +61,9 @@ def main():
       for literal in model:
           string_model += str(literal) + " "
 
-    print(string_model.strip())
+    # print(string_model.strip())
+  with open("data2.json", "w") as file:
+    json.dump(times, file)
 
 
 def parse_dimacs(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
@@ -77,10 +75,12 @@ def parse_dimacs(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
         file = input_path
 
 
-    line = file.readline()
+    for _ in range(8):
+      line = file.readline()
 
     components = line.strip().split(" ")
-
+    components = [com for com in components if com != ""]
+       
     if len(components)!= 4 or components[0]!="p" or components[1]!="cnf":
       print("Wrong file format! Expected first line to be 'p cnf NUM_VARS NUM_CLAUSES")
       exit(1)
@@ -92,8 +92,14 @@ def parse_dimacs(input_path: str) -> Tuple[Iterable[Iterable[int]], int]:
 
     line=file.readline()
     while(line):
-       numbers = [int(x) for x in line.strip().split(" ")]
-
+       if line.strip().split(" ")[0] == '%':
+          break
+       numbers = []
+       for x in line.strip().split(" "):
+          if x == "":
+             pass
+          else:
+             numbers.append(int(x))
        if(numbers[-1]!=0):
           print("Wrong format! Clause lines must be terminated with a 0")
 
